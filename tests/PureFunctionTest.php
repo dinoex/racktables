@@ -11,6 +11,12 @@ return value test that the actual return value is equal (assertEquals) or
 identical (assertSame) to the expected return value.
 */
 
+require_once '../wwwroot/inc/popup.php';
+
+// Breed hpprocurveN1178
+require ('BreedHPprocurveN1178PureProvider.php');
+// any other breed-specific files
+
 class PureFunctionTest extends RTTestCase
 {
 	/**
@@ -122,6 +128,14 @@ class PureFunctionTest extends RTTestCase
 	}
 
 	public function providerUnaryEquals ()
+	{
+		$ret = self::baseUnaryEquals();
+		$ret = array_merge ($ret, breedHPprocurveN1178UnaryEquals());
+		// any other breed-specific Unary additions
+		return $ret;
+	}
+
+	private static function baseUnaryEquals ()
 	{
 		return array
 		(
@@ -344,22 +358,22 @@ class PureFunctionTest extends RTTestCase
 			array ('formatAgeSeconds', 259200, '3d ago'),
 			array ('formatAgeSeconds', 259201, '3d ago'),
 			array ('formatAgeSeconds', 2629799, '30d ago'),
-			array ('formatAgeSeconds', 2629800, '1m ago'),
-			array ('formatAgeSeconds', 2629801, '1m ago'),
-			array ('formatAgeSeconds', 10519199, '3m 30d ago'),
-			array ('formatAgeSeconds', 10519200, '4m ago'),
-			array ('formatAgeSeconds', 10519201, '4m ago'),
-			array ('formatAgeSeconds', 31557599, '12m ago'),
+			array ('formatAgeSeconds', 2629800, '1mo ago'),
+			array ('formatAgeSeconds', 2629801, '1mo ago'),
+			array ('formatAgeSeconds', 10519199, '3mo 30d ago'),
+			array ('formatAgeSeconds', 10519200, '4mo ago'),
+			array ('formatAgeSeconds', 10519201, '4mo ago'),
+			array ('formatAgeSeconds', 31557599, '12mo ago'),
 			array ('formatAgeSeconds', 31557600, '1y ago'),
 			array ('formatAgeSeconds', 31557601, '1y ago'),
-			array ('formatAgeSeconds', 63115199, '1y 12m ago'),
+			array ('formatAgeSeconds', 63115199, '1y 12mo ago'),
 			array ('formatAgeSeconds', 63115200, '2y ago'),
 			array ('formatAgeSeconds', 63115201, '2y ago'),
 
 			array ('isInteger', -2, TRUE),
 			array ('isInteger', -1.5, FALSE),
 			array ('isInteger', -1, TRUE),
-			array ('isInteger', 0, FALSE), // implicit 2nd argument
+			array ('isInteger', 0, TRUE),
 			array ('isInteger', 0.0, FALSE),
 			array ('isInteger', 1, TRUE),
 			array ('isInteger', 1.5, FALSE),
@@ -371,7 +385,7 @@ class PureFunctionTest extends RTTestCase
 			array ('isInteger', '-2', TRUE),
 			array ('isInteger', '-1.5', FALSE),
 			array ('isInteger', '-1', TRUE),
-			array ('isInteger', '0', FALSE), // implicit 2nd argument
+			array ('isInteger', '0', TRUE),
 			array ('isInteger', '0.0', FALSE),
 			array ('isInteger', '1', TRUE),
 			array ('isInteger', '1.5', FALSE),
@@ -393,7 +407,7 @@ class PureFunctionTest extends RTTestCase
 			array ('isUnsignedInteger', -2, FALSE),
 			array ('isUnsignedInteger', -1.5, FALSE),
 			array ('isUnsignedInteger', -1, FALSE),
-			array ('isUnsignedInteger', 0, FALSE), // implicit 2nd argument
+			array ('isUnsignedInteger', 0, TRUE),
 			array ('isUnsignedInteger', 0.0, FALSE),
 			array ('isUnsignedInteger', 1, TRUE),
 			array ('isUnsignedInteger', 1.5, FALSE),
@@ -405,11 +419,32 @@ class PureFunctionTest extends RTTestCase
 			array ('isUnsignedInteger', '-2', FALSE),
 			array ('isUnsignedInteger', '-1.5', FALSE),
 			array ('isUnsignedInteger', '-1', FALSE),
-			array ('isUnsignedInteger', '0', FALSE), // implicit 2nd argument
+			array ('isUnsignedInteger', '0', TRUE),
 			array ('isUnsignedInteger', '0.0', FALSE),
 			array ('isUnsignedInteger', '1', TRUE),
 			array ('isUnsignedInteger', '1.5', FALSE),
 			array ('isUnsignedInteger', '2', TRUE),
+
+			array ('isNaturalNumber', -2, FALSE),
+			array ('isNaturalNumber', -1.5, FALSE),
+			array ('isNaturalNumber', -1, FALSE),
+			array ('isNaturalNumber', 0, FALSE),
+			array ('isNaturalNumber', 0.0, FALSE),
+			array ('isNaturalNumber', 1, TRUE),
+			array ('isNaturalNumber', 1.5, FALSE),
+			array ('isNaturalNumber', 2, TRUE),
+			array ('isNaturalNumber', NULL, FALSE),
+			array ('isNaturalNumber', FALSE, FALSE),
+			array ('isNaturalNumber', TRUE, FALSE),
+			array ('isNaturalNumber', '', FALSE),
+			array ('isNaturalNumber', '-2', FALSE),
+			array ('isNaturalNumber', '-1.5', FALSE),
+			array ('isNaturalNumber', '-1', FALSE),
+			array ('isNaturalNumber', '0', FALSE),
+			array ('isNaturalNumber', '0.0', FALSE),
+			array ('isNaturalNumber', '1', TRUE),
+			array ('isNaturalNumber', '1.5', FALSE),
+			array ('isNaturalNumber', '2', TRUE),
 
 			array ('isHTMLColor', FALSE, FALSE),
 			array ('isHTMLColor', TRUE, FALSE),
@@ -468,6 +503,16 @@ class PureFunctionTest extends RTTestCase
 			array ('datetimeFormatHint', '%Y-%m-%d', 'YYYY-MM-DD'),
 			array ('datetimeFormatHint', '%d/%m/%y', 'DD/MM/YY'),
 			array ('datetimeFormatHint', '%d.%m.%Y', 'DD.MM.YYYY'),
+
+			// validate various URI/URL combinations
+			array ('isUri', 'https://www.test.com', FALSE),
+			array ('isUri', '/js/table.js', FALSE),
+			array ('isUri', 'js/table.js', TRUE),
+			array ('isUri', '!#$%', FALSE),
+
+			array ('isUrl', 'https://www.test.com', TRUE),
+			array ('isUrl', '/js/table.js', FALSE),
+			array ('isUrl', '!#$%', FALSE),
 		);
 	}
 
@@ -947,11 +992,11 @@ class PureFunctionTest extends RTTestCase
 			array ('buildVLANFilter', 'downlink', '0-200', array (array ('from' => 2, 'to' => 200))),
 			array ('buildVLANFilter', 'downlink', '100-20000', array (array ('from' => 100, 'to' => 4094))),
 			array ('buildVLANFilter', 'downlink', '0-20000', array (array ('from' => 2, 'to' => 4094))),
-			array ('buildVLANFilter', 'anymode', '', array (array ('from' => 2, 'to' => 4094))),
+			array ('buildVLANFilter', 'anymode', '', array (array ('from' => 1, 'to' => 4094))),
 			array ('buildVLANFilter', 'anymode', '100-200', array (array ('from' => 100, 'to' => 200))),
-			array ('buildVLANFilter', 'anymode', '0-200', array (array ('from' => 2, 'to' => 200))),
+			array ('buildVLANFilter', 'anymode', '0-200', array (array ('from' => 1, 'to' => 200))),
 			array ('buildVLANFilter', 'anymode', '100-20000', array (array ('from' => 100, 'to' => 4094))),
-			array ('buildVLANFilter', 'anymode', '0-20000', array (array ('from' => 2, 'to' => 4094))),
+			array ('buildVLANFilter', 'anymode', '0-20000', array (array ('from' => 1, 'to' => 4094))),
 			array ('buildVLANFilter', 'none', '', array ()),
 			array ('buildVLANFilter', 'none', '100-200', array ()),
 			array ('buildVLANFilter', 'none', '0-200', array ()),
@@ -1082,88 +1127,6 @@ class PureFunctionTest extends RTTestCase
 			array ('goodModeForVSTRole', 'trunk', 'anymode', TRUE),
 			array ('goodModeForVSTRole', 'trunk', 'uplink', TRUE),
 			array ('goodModeForVSTRole', 'trunk', 'downlink', TRUE),
-
-			array ('isInteger', -2, FALSE, TRUE),
-			array ('isInteger', -1.5, FALSE, FALSE),
-			array ('isInteger', -1, FALSE, TRUE),
-			array ('isInteger', 0, FALSE, FALSE), // explicit 2nd argument
-			array ('isInteger', 0.0, FALSE, FALSE),
-			array ('isInteger', 1, FALSE, TRUE),
-			array ('isInteger', 1.5, FALSE, FALSE),
-			array ('isInteger', 2, FALSE, TRUE),
-			array ('isInteger', NULL, FALSE, FALSE),
-			array ('isInteger', FALSE, FALSE, FALSE),
-			array ('isInteger', TRUE, FALSE, FALSE),
-			array ('isInteger', '', FALSE, FALSE),
-			array ('isInteger', '-2', FALSE, TRUE),
-			array ('isInteger', '-1.5', FALSE, FALSE),
-			array ('isInteger', '-1', FALSE, TRUE),
-			array ('isInteger', '0', FALSE, FALSE), // explicit 2nd argument
-			array ('isInteger', '0.0', FALSE, FALSE),
-			array ('isInteger', '1', FALSE, TRUE),
-			array ('isInteger', '1.5', FALSE, FALSE),
-			array ('isInteger', '2', FALSE, TRUE),
-			array ('isInteger', -2, TRUE, TRUE),
-			array ('isInteger', -1.5, TRUE, FALSE),
-			array ('isInteger', -1, TRUE, TRUE),
-			array ('isInteger', 0, TRUE, TRUE), // explicit 2nd argument
-			array ('isInteger', 0.0, TRUE, FALSE),
-			array ('isInteger', 1, TRUE, TRUE),
-			array ('isInteger', 1.5, TRUE, FALSE),
-			array ('isInteger', 2, TRUE, TRUE),
-			array ('isInteger', NULL, TRUE, FALSE),
-			array ('isInteger', FALSE, TRUE, FALSE),
-			array ('isInteger', TRUE, TRUE, FALSE),
-			array ('isInteger', '', TRUE, FALSE),
-			array ('isInteger', '-2', TRUE, TRUE),
-			array ('isInteger', '-1.5', TRUE, FALSE),
-			array ('isInteger', '-1', TRUE, TRUE),
-			array ('isInteger', '0', TRUE, TRUE), // explicit 2nd argument
-			array ('isInteger', '0.0', TRUE, FALSE),
-			array ('isInteger', '1', TRUE, TRUE),
-			array ('isInteger', '1.5', TRUE, FALSE),
-			array ('isInteger', '2', TRUE, TRUE),
-
-			array ('isUnsignedInteger', -2, FALSE, FALSE),
-			array ('isUnsignedInteger', -1.5, FALSE, FALSE),
-			array ('isUnsignedInteger', -1, FALSE, FALSE),
-			array ('isUnsignedInteger', 0, FALSE, FALSE), // explicit 2nd argument
-			array ('isUnsignedInteger', 0.0, FALSE, FALSE),
-			array ('isUnsignedInteger', 1, FALSE, TRUE),
-			array ('isUnsignedInteger', 1.5, FALSE, FALSE),
-			array ('isUnsignedInteger', 2, FALSE, TRUE),
-			array ('isUnsignedInteger', NULL, FALSE, FALSE),
-			array ('isUnsignedInteger', FALSE, FALSE, FALSE),
-			array ('isUnsignedInteger', TRUE, FALSE, FALSE),
-			array ('isUnsignedInteger', '', FALSE, FALSE),
-			array ('isUnsignedInteger', '-2', FALSE, FALSE),
-			array ('isUnsignedInteger', '-1.5', FALSE, FALSE),
-			array ('isUnsignedInteger', '-1', FALSE, FALSE),
-			array ('isUnsignedInteger', '0', FALSE, FALSE), // explicit 2nd argument
-			array ('isUnsignedInteger', '0.0', FALSE, FALSE),
-			array ('isUnsignedInteger', '1', FALSE, TRUE),
-			array ('isUnsignedInteger', '1.5', FALSE, FALSE),
-			array ('isUnsignedInteger', '2', FALSE, TRUE),
-			array ('isUnsignedInteger', -2, TRUE, FALSE),
-			array ('isUnsignedInteger', -1.5, TRUE, FALSE),
-			array ('isUnsignedInteger', -1, TRUE, FALSE),
-			array ('isUnsignedInteger', 0, TRUE, TRUE), // explicit 2nd argument
-			array ('isUnsignedInteger', 0.0, TRUE, FALSE),
-			array ('isUnsignedInteger', 1, TRUE, TRUE),
-			array ('isUnsignedInteger', 1.5, TRUE, FALSE),
-			array ('isUnsignedInteger', 2, TRUE, TRUE),
-			array ('isUnsignedInteger', NULL, TRUE, FALSE),
-			array ('isUnsignedInteger', FALSE, TRUE, FALSE),
-			array ('isUnsignedInteger', TRUE, TRUE, FALSE),
-			array ('isUnsignedInteger', '', TRUE, FALSE),
-			array ('isUnsignedInteger', '-2', TRUE, FALSE),
-			array ('isUnsignedInteger', '-1.5', TRUE, FALSE),
-			array ('isUnsignedInteger', '-1', TRUE, FALSE),
-			array ('isUnsignedInteger', '0', TRUE, TRUE), // explicit 2nd argument
-			array ('isUnsignedInteger', '0.0', TRUE, FALSE),
-			array ('isUnsignedInteger', '1', TRUE, TRUE),
-			array ('isUnsignedInteger', '1.5', TRUE, FALSE),
-			array ('isUnsignedInteger', '2', TRUE, TRUE),
 
 			// explicit 2nd argument
 			array ('colorHex2Rgb', '000000', FALSE, '0,0,0'),
@@ -1487,10 +1450,67 @@ class PureFunctionTest extends RTTestCase
 					'ip' => '0.0.0.0',
 				),
 			),
+			array
+			(
+				'sortObjectAddressesAndNames',
+				array ('object_name' => 'server a', 'port_name' => 'port b', 'ip' => '10.0.0.20'),
+				array ('object_name' => 'server b', 'port_name' => 'port a', 'ip' => '10.0.0.1'),
+				-1
+			),
+			array
+			(
+				'sortObjectAddressesAndNames',
+				array ('object_name' => 'server b', 'port_name' => 'port a', 'ip' => '10.0.0.1'),
+				array ('object_name' => 'server a', 'port_name' => 'port b', 'ip' => '10.0.0.20'),
+				1
+			),
+			array
+			(
+				'sortObjectAddressesAndNames',
+				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.20'),
+				array ('object_name' => 'server a', 'port_name' => 'port b', 'ip' => '10.0.0.1'),
+				-1
+			),
+			array
+			(
+				'sortObjectAddressesAndNames',
+				array ('object_name' => 'server a', 'port_name' => 'port b', 'ip' => '10.0.0.1'),
+				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.20'),
+				1
+			),
+			array
+			(
+				'sortObjectAddressesAndNames',
+				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.1'),
+				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.20'),
+				-1
+			),
+			array
+			(
+				'sortObjectAddressesAndNames',
+				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.20'),
+				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.1'),
+				1
+			),
+			array
+			(
+				'sortObjectAddressesAndNames',
+				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.1'),
+				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.1'),
+				0
+			),
 		);
 	}
 
 	public function providerTernaryEquals ()
+	{
+		$ret = self::baseTernaryEquals();
+		$ret = array_merge ($ret, breedHPprocurveN1178TernaryEquals());
+		// any other breed-specific Ternary additions
+		return $ret;
+	}
+
+	private static function baseTernaryEquals ()
 	{
 		return array
 		(

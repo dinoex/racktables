@@ -85,16 +85,16 @@ function not_already_installed()
 	}
 	else
 	{
-		echo 'There seem to be no existing installation here, I am going to setup one now.<br>';
+		echo 'There seems to be no existing installation here, let\'s set one up now.<br>';
 		return TRUE;
 	}
 }
 
-// Check that we can write to configuration file.
-// If so, ask for DB connection paramaters and test
-// the connection. Neither save the parameters nor allow
-// going further until we succeed with the given
-// credentials.
+// Test that the web-server can write to the configuration file.
+// If so, prompt for the DB connection parameters and test
+// the connection. Do not save the parameters into the configuration
+// file until the database connection succeeds. Do not proceed to the
+// next steps until a working configuration file is in place.
 function init_config ()
 {
 	function print_form
@@ -317,7 +317,7 @@ function check_config_access()
 	global $path_to_secret_php;
 	if (! is_writable ($path_to_secret_php) && is_readable ($path_to_secret_php))
 	{
-		echo 'The configuration file ownership/permissions seem to be OK.<br>';
+		echo 'The configuration file ownership and permissions seem to be OK.<br>';
 		return TRUE;
 	}
 	$uname = get_process_owner();
@@ -636,7 +636,7 @@ function get_pseudo_file ($name)
   `object_id` int(10) unsigned NOT NULL default '0',
   `ip` int(10) unsigned NOT NULL default '0',
   `name` char(255) NOT NULL default '',
-  `type` enum('regular','shared','virtual','router','point2point') NOT NULL DEFAULT 'regular',
+  `type` enum('regular','shared','virtual','router','point2point','sharedrouter') NOT NULL DEFAULT 'regular',
   PRIMARY KEY  (`object_id`,`ip`),
   KEY `ip` (`ip`),
   CONSTRAINT `IPv4Allocation-FK-object_id` FOREIGN KEY (`object_id`) REFERENCES `Object` (`id`) ON DELETE CASCADE
@@ -748,7 +748,7 @@ function get_pseudo_file ($name)
   `object_id` int(10) unsigned NOT NULL default '0',
   `ip` binary(16) NOT NULL,
   `name` char(255) NOT NULL default '',
-  `type` enum('regular','shared','virtual','router','point2point') NOT NULL DEFAULT 'regular',
+  `type` enum('regular','shared','virtual','router','point2point','sharedrouter') NOT NULL DEFAULT 'regular',
   PRIMARY KEY  (`object_id`,`ip`),
   KEY `ip` (`ip`),
   CONSTRAINT `IPv6Allocation-FK-object_id` FOREIGN KEY (`object_id`) REFERENCES `Object` (`id`) ON DELETE CASCADE
@@ -1059,6 +1059,7 @@ function get_pseudo_file ($name)
   `is_assignable` enum('yes','no') NOT NULL DEFAULT 'yes',
   `tag` char(255) default NULL,
   `color` mediumint(8) unsigned DEFAULT NULL,
+  `description` char(255) COLLATE utf8_unicode_ci DEFAULT NULL,
   PRIMARY KEY  (`id`),
   UNIQUE KEY `tag` (`tag`),
   KEY `TagTree-K-parent_id` (`parent_id`),
@@ -1670,7 +1671,8 @@ WHERE O.objtype_id = 1562";
 (12,'CFP2'),
 (13,'CPAK'),
 (14,'CXP'),
-(15,'QSFP28')";
+(15,'QSFP28'),
+(16,'SFP28')";
 
 		$query[] = "INSERT INTO `PortOuterInterface` VALUES
 (16,'AC-in'),
@@ -1866,9 +1868,16 @@ WHERE O.objtype_id = 1562";
 (1589,'empty CFP2'),
 (1590,'empty CPAK'),
 (1591,'empty CXP'),
+(1592,'empty SFP28'),
 (1603,'1000Base-T (HP c-Class)'),
 (1604,'100Base-TX (HP c-Class)'),
 (1642,'10GBase-T'),
+(1651,'25GBase-KR'),
+(1652,'25GBase-T'),
+(1653,'25GBase-CR'),
+(1654,'25GBase-SR'),
+(1655,'25GBase-LR'),
+(1656,'25Gbase-ER'),
 (1660,'40GBase-FR'),
 (1661,'40GBase-KR4'),
 (1662,'40GBase-ER4'),
@@ -1979,6 +1988,10 @@ WHERE O.objtype_id = 1562";
 (14,1591),(14,1677),(14,1678),
 -- QSFP28: empty QSFP, 40GBase-FR, 40GBase-ER4, 40GBase-SR4, 40GBase-LR4, 100GBase-LR4, 100GBase-ER4, 100GBase-SR4, 100GBase-KR4, 100GBase-KP4
 (15,1588),(15,1660),(15,1662),(15,1663),(15,1664),(15,1670),(15,1671),(15,1672),(15,1673),(15,1674),
+-- SFP28: empty SFP28, 25Gbase-KR, 25GBase-CR, 25Gbase-SR, 25GBase-LR, 25GBase-ER
+(16,1592),(16,1651),(16,1653),(16,1654),(16,1655),(16,1656),
+-- SFP28: 10GBase-SR, 10GBase-ER, 10GBase-LR, 10GBase-LRM, 10GBase-ZR, 10GBase-LX4, 10GBase-CX4
+(16,30),(16,35),(16,36),(16,37),(16,38),(16,39),(16,40),
 -- hardwired: AC-in, 100Base-TX, 1000Base-T, RS-232 (RJ-45), virtual bridge, KVM (host), KVM (console), RS-232 (DB-9), RS-232 (DB-25), AC-out, DC, virtual port
 (1,16),(1,19),(1,24),(1,29),(1,31),(1,33),(1,446),(1,681),(1,682),(1,1322),(1,1399),(1,1469)";
 
@@ -2171,7 +2184,15 @@ WHERE O.objtype_id = 1562";
 (1589,1590),
 (1590,1590),
 (1591,1591),
+(1592,1592),
+(1592,1084),
 (1603,1603),
+(1651,1651),
+(1652,1652),
+(1653,1653),
+(1654,1654),
+(1655,1655),
+(1656,1656),
 (1660,1660),
 (1661,1661),
 (1662,1662),
@@ -2243,7 +2264,7 @@ WHERE O.objtype_id = 1562";
 ('TAGS_QUICKLIST_THRESHOLD','50','uint','yes','no','yes','Tags quick list threshold'),
 ('ENABLE_MULTIPORT_FORM','no','string','no','no','yes','Enable \"Add/update multiple ports\" form'),
 ('DEFAULT_PORT_IIF_ID','1','uint','no','no','no','Default port inner interface ID'),
-('DEFAULT_PORT_OIF_IDS','1=24; 3=1078; 4=1077; 5=1079; 6=1080; 8=1082; 9=1084; 10=1588; 11=1668; 12=1589; 13=1590; 14=1591; 15=1588','string','no','no','no','Default port outer interface IDs'),
+('DEFAULT_PORT_OIF_IDS','1=24; 3=1078; 4=1077; 5=1079; 6=1080; 8=1082; 9=1084; 10=1588; 11=1668; 12=1589; 13=1590; 14=1591; 15=1588; 16=1592','string','no','no','no','Default port outer interface IDs'),
 ('IPV4_TREE_RTR_AS_CELL','no','string','no','no','yes','Show full router info for each network in IPv4 tree view'),
 ('PROXIMITY_RANGE','0','uint','yes','no','yes','Proximity range (0 is current rack only)'),
 ('VLANSWITCH_LISTSRC', '', 'string', 'yes', 'no', 'yes', 'List of VLAN running switches'),
@@ -2268,7 +2289,7 @@ WHERE O.objtype_id = 1562";
 ('MGMT_PROTOS','ssh: {\$typeid_4}; telnet: {\$typeid_8}','string','yes','no','yes','Mapping of management protocol to devices'),
 ('SYNC_8021Q_LISTSRC','','string','yes','no','no','List of VLAN switches sync is enabled on'),
 ('QUICK_LINK_PAGES','depot,ipv4space,rackspace','string','yes','no','yes','List of pages to display in quick links'),
-('VIRTUAL_OBJ_LISTSRC','1504,1505,1506,1507','string','no','no','no','List source: virtual objects'),
+('VIRTUAL_OBJ_CSV','1504,1505,1506,1507','string','no','no','no','List source: virtual objects'),
 ('DATETIME_ZONE','UTC','string','yes','no','yes','Timezone to use for displaying/calculating dates'),
 ('DATETIME_FORMAT','%Y-%m-%d','string','no','no','yes','PHP strftime() format for date+time'),
 ('DATEONLY_FORMAT','%Y-%m-%d','string','no','no','yes','PHP strftime() format for dates'),
@@ -2278,6 +2299,7 @@ WHERE O.objtype_id = 1562";
 ('REVERSED_RACKS_LISTSRC', 'false', 'string', 'yes', 'no', 'no', 'List of racks with reversed (top to bottom) units order'),
 ('NEAREST_RACKS_CHECKBOX', 'yes', 'string', 'yes', 'no', 'yes', 'Enable nearest racks in port list filter by default'),
 ('SHOW_OBJECTTYPE', 'yes', 'string', 'no', 'no', 'yes', 'Show object type column on depot page'),
+('OBJECTLOG_PREVIEW_ENTRIES','5','uint','no','no','yes','Object log preview maximum entries (0 disables the preview)'),
 ('DB_VERSION','${db_version}','string','no','yes','no','Database version.')";
 
 		$query[] = "INSERT INTO `Script` VALUES ('RackCode','allow {\$userid_1}')";

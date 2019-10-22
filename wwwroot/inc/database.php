@@ -164,7 +164,7 @@ $SQLSchema = array
 	),
 	'row' => array
 	(
-		'table' => 'Row',
+		'table' => '`Row`',
 		'columns' => array
 		(
 			'id' => 'id',
@@ -277,13 +277,13 @@ function getLocations ($location_id)
 function getRowInfo ($row_id)
 {
 	$query =
-		"SELECT Row.id AS id, Row.name AS name, COUNT(Rack.id) AS count, " .
+		"SELECT `Row`.id AS id, `Row`.name AS name, COUNT(Rack.id) AS count, " .
 		"IF(ISNULL(SUM(Rack.height)),0,SUM(Rack.height)) AS sum, " .
 		"Location.id AS location_id, Location.name AS location " .
-		"FROM Row LEFT JOIN Rack ON Rack.row_id = Row.id " .
-		"LEFT OUTER JOIN Location ON Row.location_id = Location.id " .
-		"WHERE Row.id = ? " .
-		"GROUP BY Row.id, Location.id";
+		"FROM `Row` LEFT JOIN Rack ON Rack.row_id = `Row`.id " .
+		"LEFT OUTER JOIN Location ON `Row`.location_id = Location.id " .
+		"WHERE `Row`.id = ? " .
+		"GROUP BY `Row`.id, Location.id";
 	$result = usePreparedSelectBlade ($query, array ($row_id));
 	if ($row = $result->fetch (PDO::FETCH_ASSOC))
 		return $row;
@@ -301,7 +301,7 @@ function getRows ($location_id)
 {
 	$result = usePreparedSelectBlade
 	(
-		'SELECT R.id, R.name FROM Row R ' .
+		'SELECT R.id, R.name FROM `Row` R ' .
 		'INNER JOIN EntityLink EL ON ' .
 		"EL.parent_entity_type = 'location' " .
 		"AND EL.child_entity_type = 'row' " .
@@ -495,7 +495,8 @@ function listCells ($realm, $parent_id = 0)
 				'id' => $tag_id,
 				'tag' => $taglist[$tag_id]['tag'],
 				'parent_id' => $taglist[$tag_id]['parent_id'],
-				'color' =>  $taglist[$tag_id]['color'],
+				'color' => $taglist[$tag_id]['color'],
+				'description' => $taglist[$tag_id]['description'],
 				'user' => $row['tag_user'],
 				'time' => $row['tag_time'],
 			);
@@ -608,7 +609,8 @@ function spotEntity ($realm, $id, $ignore_cache = FALSE)
 					'id' => $row['tag_id'],
 					'tag' => $taglist[$row['tag_id']]['tag'],
 					'parent_id' => $taglist[$row['tag_id']]['parent_id'],
-					'color' =>  $taglist[$row['tag_id']]['color'],
+					'color' => $taglist[$row['tag_id']]['color'],
+					'description' => $taglist[$row['tag_id']]['description'],
 					'user' => $row['tag_user'],
 					'time' => $row['tag_time'],
 				);
@@ -619,7 +621,8 @@ function spotEntity ($realm, $id, $ignore_cache = FALSE)
 				'id' => $row['tag_id'],
 				'tag' => $taglist[$row['tag_id']]['tag'],
 				'parent_id' => $taglist[$row['tag_id']]['parent_id'],
-				'color' =>  $taglist[$row['tag_id']]['color'],
+				'color' => $taglist[$row['tag_id']]['color'],
+				'description' => $taglist[$row['tag_id']]['description'],
 				'user' => $row['tag_user'],
 				'time' => $row['tag_time'],
 			);
@@ -1446,7 +1449,7 @@ function commitUpdateRack ($rack_id, $new_row_id, $new_name, $new_height, $new_h
 		throw new InvalidArgException ('new_height', $new_height, 'Cannot shrink rack, objects are still mounted there');
 
 	// Determine if the row changed
-	$old_rack =  spotEntity ('rack', $rack_id);
+	$old_rack = spotEntity ('rack', $rack_id);
 	$old_row_id = $old_rack['row_id'];
 	if ($old_row_id != $new_row_id)
 	{
@@ -1647,7 +1650,7 @@ function getRackspaceHistory ()
 function getOperationMolecules ($op_id)
 {
 	$result = usePreparedSelectBlade ('SELECT old_molecule_id, new_molecule_id FROM MountOperation WHERE id = ?', array ($op_id));
-	// We expect one row.
+	// The result is a single row.
 	$row = $result->fetch (PDO::FETCH_ASSOC);
 	return array ($row['old_molecule_id'], $row['new_molecule_id']);
 }
@@ -2711,7 +2714,6 @@ function updateIPv6Bond ($ip_bin, $object_id=0, $name='', $type='')
 	);
 }
 
-
 function unbindIPFromObject ($ip_bin, $object_id)
 {
 	switch (strlen ($ip_bin))
@@ -2885,7 +2887,7 @@ function getAccountSearchResult ($terms)
 	$byUsername = getSearchResultByField
 	(
 		'UserAccount',
-		array ('user_id', 'user_name', 'user_realname'),
+		array ('user_id'),
 		'user_name',
 		$terms,
 		'user_name'
@@ -2893,7 +2895,7 @@ function getAccountSearchResult ($terms)
 	$byRealname = getSearchResultByField
 	(
 		'UserAccount',
-		array ('user_id', 'user_name', 'user_realname'),
+		array ('user_id'),
 		'user_realname',
 		$terms,
 		'user_name'
@@ -2902,11 +2904,7 @@ function getAccountSearchResult ($terms)
 	$ret = array();
 	foreach (array ($byRealname, $byUsername) as $array)
 		foreach ($array as $user)
-		{
-			$user['realm'] = 'user';
-			$user['id'] = $user['user_id'];
-			$ret[$user['user_id']] = $user;
-		}
+			$ret[$user['user_id']] = spotEntity ('user', $user['user_id']);
 	return $ret;
 }
 
@@ -2992,7 +2990,7 @@ function getRowSearchResult ($terms)
 {
 	$byName = getSearchResultByField
 	(
-		'Row',
+		'`Row`',
 		array ('id'),
 		'name',
 		$terms,
@@ -3344,19 +3342,20 @@ WHERE
 	return $result->fetchAll (PDO::FETCH_COLUMN, 0);
 }
 
-
 // returns user_id
 // throws an exception if error occured
-function commitCreateUserAccount ($username, $realname, $password)
+function commitCreateUserAccount ($username, $realname, $password_hash)
 {
+	if (! preg_match ('/^[0-9a-f]{40}$/', $password_hash))
+		throw new InvalidArgException ('password_hash', $password_hash, 'not a 20-octet hex string');
 	usePreparedInsertBlade
 	(
 		'UserAccount',
 		array
 		(
 			'user_name' => $username,
-			'user_realname' => $realname == '' ? NULL : $realname,
-			'user_password_hash' => $password,
+			'user_realname' => nullIfEmptyStr ($realname),
+			'user_password_hash' => $password_hash,
 		)
 	);
 	$user_id = lastInsertID();
@@ -3364,19 +3363,37 @@ function commitCreateUserAccount ($username, $realname, $password)
 	return $user_id;
 }
 
-function commitUpdateUserAccount ($id, $new_username, $new_realname, $new_password)
+// Update the password only if it is provided.
+function commitUpdateUserAccount ($id, $new_username, $new_realname, $new_password_hash = '')
 {
-	usePreparedUpdateBlade
+	$set_columns = array
 	(
-		'UserAccount',
-		array
-		(
-			'user_name' => $new_username,
-			'user_realname' => $new_realname == '' ? NULL : $new_realname,
-			'user_password_hash' => $new_password,
-		),
-		array ('user_id' => $id)
+		'user_name' => $new_username,
+		'user_realname' => nullIfEmptyStr ($new_realname),
 	);
+	if ($new_password_hash != '')
+	{
+		if (! preg_match ('/^[0-9a-f]{40}$/', $new_password_hash))
+			throw new InvalidArgException ('new_password_hash', $new_password_hash, 'not a 20-octet hex string');
+		$set_columns['user_password_hash'] = $new_password_hash;
+	}
+	$userinfo = spotEntity ('user', $id);
+	usePreparedUpdateBlade ('UserAccount', $set_columns, array ('user_id' => $id));
+	// There is no FK to do this update as user-specific configuration is always local,
+	// but authentication may be not (the rows in UserConfig may have no matching
+	// rows in UserAccount).
+	if ($userinfo['user_name'] != $new_username)
+		usePreparedUpdateBlade ('UserConfig', array ('user' => $new_username), array('user' => $userinfo['user_name']));
+}
+
+function commitDeleteUserAccount ($id)
+{
+	if ($id == 1)
+		throw new InvalidArgException ('id', $id, 'belongs to the administrator account');
+	$userinfo = spotEntity ('user', $id);
+	destroyTagsForEntity ('user', $id);
+	usePreparedDeleteBlade ('UserConfig', array ('user' => $userinfo['user_name']));
+	usePreparedDeleteBlade ('UserAccount', array ('user_id' => $id));
 }
 
 // This function returns an array of all port type pairs from PortCompat table.
@@ -3491,7 +3508,7 @@ function getDictStats ()
 	$ret['Words in user chapters'] = $uw;
 	$ret['Total objects'] = $to;
 	$ret['Objects with stickers'] = $so;
-	$ret['Total stickers attached']  = $ta;
+	$ret['Total stickers attached'] = $ta;
 	return $ret;
 }
 
@@ -3538,7 +3555,7 @@ function getRackspaceStats ()
 {
 	$ret = array();
 	$subject = array();
-	$subject[] = array ('q' => 'select count(*) from Row', 'txt' => 'Rows');
+	$subject[] = array ('q' => 'select count(*) from `Row`', 'txt' => 'Rows');
 	$subject[] = array ('q' => 'select count(*) from Rack', 'txt' => 'Racks');
 	$subject[] = array ('q' => 'select avg(height) from Rack', 'txt' => 'Average rack height');
 	$subject[] = array ('q' => 'select sum(height) from Rack', 'txt' => 'Total rack units in field');
@@ -3565,8 +3582,6 @@ function commitDeleteChapter ($chapter_no)
 	usePreparedDeleteBlade ('Chapter', array ('id' => $chapter_no, 'sticky' => 'no'));
 }
 
-// This is a dictionary accessor. We perform link rendering, so the user sees
-// nice <select> drop-downs.
 function readChapter ($chapter_id, $style = '')
 {
 	$result = usePreparedSelectBlade ('SELECT id FROM Chapter WHERE id = ?', array ($chapter_id));
@@ -3590,7 +3605,8 @@ function readChapter ($chapter_id, $style = '')
 		}
 		$chapter[$row['dict_key']] = $value;
 	}
-	// SQL ORDER BY had no sense, because we need to sort after link rendering, not before.
+	// SQL ORDER BY would make no sense in the query above because the rows need
+	// to be sorted after the wiki link parsing, not before.
 	// Try to sort after the parsing in the same way as ORDER BY would do.
 	asort ($chapter, SORT_STRING | SORT_FLAG_CASE);
 	return $chapter;
@@ -4271,7 +4287,7 @@ function getTagList ($extra_sql = '')
 {
 	$result = usePreparedSelectBlade
 	(
-		'SELECT id, parent_id, is_assignable, tag, LPAD(HEX(color), 6, "0") AS color ' .
+		'SELECT id, parent_id, is_assignable, tag, LPAD(HEX(color), 6, "0") AS color, description ' .
 		"FROM TagTree ORDER BY tag ${extra_sql}"
 	);
 	return reindexById ($result->fetchAll (PDO::FETCH_ASSOC));
@@ -4449,7 +4465,7 @@ function createIPv4Prefix ($range = '', $name = '', $is_connected = FALSE, $tagl
 	// $range is in x.x.x.x/x format, split into ip/mask vars
 	$rangeArray = explode('/', $range);
 	if (count ($rangeArray) != 2)
-		throw new InvalidRequestArgException ('range', $range, 'Invalid IPv4 prefix');
+		throw new InvalidArgException ('range', $range, 'Invalid IPv4 prefix');
 	$ip = $rangeArray[0];
 	$mask = $rangeArray[1];
 	$forbidden_ranges = array
@@ -4491,7 +4507,7 @@ function createIPv6Prefix ($range = '', $name = '', $is_connected = FALSE, $tagl
 	// $range is in aaa0:b::c:d/x format, split into ip/mask vars
 	$rangeArray = explode ('/', $range);
 	if (count ($rangeArray) != 2)
-		throw new InvalidRequestArgException ('range', $range, 'Invalid IPv6 prefix');
+		throw new InvalidArgException ('range', $range, 'Invalid IPv6 prefix');
 	$ip = $rangeArray[0];
 	$mask = $rangeArray[1];
 	$net = constructIPRange (ip6_parse ($ip), $mask);
@@ -4631,6 +4647,12 @@ function updatePortForwarding ($object_id, $localip_bin, $localport, $remoteip_b
 	);
 }
 
+function getNATv4CountForObject ($object_id)
+{
+	$result = usePreparedSelectBlade ('SELECT COUNT(*) FROM IPv4NAT WHERE object_id = ?', array ($object_id));
+	return $result->fetchColumn();
+}
+
 function getNATv4ForObject ($object_id)
 {
 	$ret = array();
@@ -4697,12 +4719,12 @@ function getAllUnlinkedFiles ($entity_type, $entity_id)
 {
 	$result = usePreparedSelectBlade
 	(
-		'SELECT id, name FROM File ' .
+		'SELECT id, name, SUBSTR(comment FROM 1 FOR 128) AS comment FROM File ' .
 		'WHERE id NOT IN (SELECT file_id FROM FileLink WHERE entity_type = ? AND entity_id = ?) ' .
 		'ORDER BY name, id',
 		array ($entity_type, $entity_id)
 	);
-	return reduceSubarraysToColumn (reindexById ($result->fetchAll (PDO::FETCH_ASSOC)), 'name');
+	return $result->fetchAll (PDO::FETCH_ASSOC);
 }
 
 // FIXME: return a standard cell list, so upper layer can iterate over
@@ -4711,25 +4733,12 @@ function getFilesOfEntity ($entity_type, $entity_id)
 {
 	$result = usePreparedSelectBlade
 	(
-		'SELECT FileLink.file_id, FileLink.id AS link_id, name, type, size, ctime, mtime, atime, comment ' .
+		'SELECT FileLink.file_id as id, FileLink.id AS link_id, name, type, size, ctime, mtime, atime, comment ' .
 		'FROM FileLink LEFT JOIN File ON FileLink.file_id = File.id ' .
 		'WHERE FileLink.entity_type = ? AND FileLink.entity_id = ? ORDER BY name',
 		array ($entity_type, $entity_id)
 	);
-	$ret = array();
-	while ($row = $result->fetch (PDO::FETCH_ASSOC))
-		$ret[$row['file_id']] = array (
-			'id' => $row['file_id'],
-			'link_id' => $row['link_id'],
-			'name' => $row['name'],
-			'type' => $row['type'],
-			'size' => $row['size'],
-			'ctime' => $row['ctime'],
-			'mtime' => $row['mtime'],
-			'atime' => $row['atime'],
-			'comment' => $row['comment'],
-		);
-	return $ret;
+	return reindexById ($result->fetchAll (PDO::FETCH_ASSOC));
 }
 
 function getFile ($file_id)
@@ -4921,7 +4930,7 @@ function acquireLDAPCache ($username, $max_tries = 2)
 	if ($row = fetchLDAPCacheRow ($username, 'FOR UPDATE'))
 		return $row;
 
-	// maybe another instance deleted our row before we've locked it. Try again
+	// Maybe another instance deleted the row before this instance had locked it. Try again.
 	if ($max_tries > 0)
 		return $self ($username, $max_tries - 1);
 
@@ -5191,7 +5200,7 @@ function getDomainGroupMembers ($vdom_group_id)
 }
 
 // This function is pretty heavy. Consider use of getDomainVLANList instead
-// If $strict is false, returns VLANs belonging to the domain or group.
+// If $strict is FALSE, returns VLANs belonging to the domain or group.
 // Otherwise the vlans of group subdomains are not returned.
 function getDomainVLANs ($vdom_id, $strict = FALSE)
 {
@@ -5244,7 +5253,7 @@ END
 }
 
 // faster than getDomainVLANs, but w/o statistics.
-// If $strict is false, returns VLANs belonging to the domain or group.
+// If $strict is FALSE, returns VLANs belonging to the domain or group.
 // Otherwise the vlans of group subdomains are not returned.
 function getDomainVLANList ($vdom_id, $strict = FALSE)
 {
@@ -5578,7 +5587,6 @@ function upd8021QPort ($instance = 'desired', $object_id, $port_name, $port, $be
 			array ('object_id' => $object_id, 'port_name' => $port_name)
 		);
 
-
 	if (isset ($before))
 	{
 		$add_list = array_diff ($port['allowed'], $before['allowed']);
@@ -5740,7 +5748,7 @@ function setConfigVar ($varname, $varvalue)
 		throw new InvalidArgException ('varname', $varname, 'a hidden variable cannot be changed');
 	if ($varvalue == '' && $var['emptyok'] != 'yes')
 		throw new InvalidArgException ('varvalue', $varvalue, "'${varname}' must have a non-empty value");
-	if ($varvalue != '' && $var['vartype'] == 'uint' && ! isUnsignedInteger ($varvalue, TRUE))
+	if ($varvalue != '' && $var['vartype'] == 'uint' && ! isUnsignedInteger ($varvalue))
 		throw new InvalidArgException ('varvalue', $varvalue, "'${varname}' must be an unsigned integer");
 	// Update cache only if the changes went into DB.
 	usePreparedUpdateBlade ('Config', array ('varvalue' => $varvalue), array ('varname' => $varname));
@@ -5763,7 +5771,7 @@ function setUserConfigVar ($varname, $varvalue)
 		throw new InvalidArgException ('varname', $varname, 'a hidden variable cannot be changed');
 	if ($varvalue == '' && $var['emptyok'] != 'yes')
 		throw new InvalidArgException ('varvalue', $varvalue, "'${varname}' must have a non-empty value");
-	if ($varvalue != '' && $var['vartype'] == 'uint' && ! isUnsignedInteger ($varvalue, TRUE))
+	if ($varvalue != '' && $var['vartype'] == 'uint' && ! isUnsignedInteger ($varvalue))
 		throw new InvalidArgException ('varvalue', $varvalue, "'${varname}' must be an unsigned integer");
 	// Update cache only if the changes went into DB.
 	usePreparedExecuteBlade
@@ -5866,14 +5874,13 @@ function isTransactionActive()
 			$dbxlink->rollBack();
 			return FALSE;
 		}
-		throw new RackTablesError ("beginTransaction returned false instead of throwing exception", RackTablesError::INTERNAL);
+		throw new RackTablesError ("beginTransaction() returned FALSE instead of throwing exception", RackTablesError::INTERNAL);
 	}
 	catch (PDOException $e)
 	{
 		return TRUE;
 	}
 }
-
 
 function getRowsCount ($table)
 {
@@ -6046,7 +6053,7 @@ function getDBName()
 }
 
 // Sets exclusive server-global named lock.
-// Always returns TRUE if no exceptions were thrown
+// Returns TRUE or throws an exceptions.
 // A lock is implicitly released on any subsequent call to setDBMutex in the same connection
 function setDBMutex ($name, $timeout = 5)
 {

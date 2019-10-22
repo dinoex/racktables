@@ -93,6 +93,9 @@ table.molecule {
 .centered {
 	text-align: center;
 }
+.vertical-rl {
+	writing-mode: vertical-rl;
+}
 table.objectview {
 	width: 100%;
 }
@@ -165,6 +168,12 @@ td.tagbox.selected-inverted {
 }
 td.tagbox.inverted {
 	text-decoration: line-through;
+}
+span.tag-descr, a.tag-descr {
+	border-bottom: 1px dashed;
+}
+span.tag-descr {
+	cursor: help;
 }
 
 td.sticker {
@@ -763,7 +772,7 @@ a.img-link {
 	font-family: "Courier New",Courier,monospace;
 }
 
-/* VLAN lists diff formatting (8021Q Ports and 8021Q Sync pages) */
+/* VLAN lists diff formatting (802.1Q Ports and 802.1Q Sync pages) */
 .vlan-diff {
 	font-weight: bold;
 	float: right;

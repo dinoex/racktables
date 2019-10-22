@@ -16,7 +16,7 @@ class LinkTriggerTest extends RTTestCase
 	public static function setUpBeforeClass ()
 	{
 		// make sure AUTOPORTS_CONFIG is empty
-		self::$autoports_config_var = getConfigVar ('AUTOPORTS_CONFIG'); 
+		self::$autoports_config_var = getConfigVar ('AUTOPORTS_CONFIG');
 		if (self::$autoports_config_var != '')
 			setConfigVar ('AUTOPORTS_CONFIG', '');
 
@@ -30,7 +30,7 @@ class LinkTriggerTest extends RTTestCase
 		// add sample data
 		//   - set port a & b's type to 1000Base-T
 		//   - set port c's type to the incompatible one
-		self::$object_id = commitAddObject ('unit test object', NULL, 4, NULL);
+		self::$object_id = commitAddObject (self::myStringStatic ('object', __CLASS__), NULL, 4, NULL);
 		self::$porta = commitAddPort (self::$object_id, 'test porta', '1-24', NULL, NULL);
 		self::$portb = commitAddPort (self::$object_id, 'test portb', '1-24', NULL, NULL);
 		self::$portc = commitAddPort (self::$object_id, 'test portc', self::$portc_type, NULL, NULL);

@@ -15,8 +15,6 @@ implement the "interface" module.
 
 require_once 'slb-interface.php';
 
-define ('RE_STATIC_URI', '#^(?:[[:alnum:]]+[[:alnum:]_.-]*/)+[[:alnum:]\._-]+\.([[:alpha:]]+)$#');
-
 $color = array();
 
 function castRackImageException ($e)
@@ -57,9 +55,9 @@ function dispatchImageRequest()
 		{
 			fixContext();
 			assertPermission();
-			$scale = genericAssertion ('scale', 'uint');
+			$scale = genericAssertion ('scale', 'natural');
 			$object_id = array_key_exists ('object_id', $_REQUEST) ?
-				genericAssertion ('object_id', 'uint') : NULL;
+				genericAssertion ('object_id', 'natural') : NULL;
 		}
 		catch (RackTablesError $e)
 		{
@@ -347,7 +345,7 @@ function renderProgressBar4Image ($px1, $px2, $px3)
 		colorFromHex ($img, '808080'),
 		colorFromHex ($img, 'c0c0c0'),
 	);
-	$pos =  0;
+	$pos = 0;
 	for ($i = 0; $i < count ($offsets); $i++)
 	{
 		$off = $offsets[$i];
@@ -455,14 +453,20 @@ function proxyStaticURI ($URI)
 {
 	$content_type = array
 	(
-		'css' => 'text/css',
-		'js' => 'text/javascript',
-		'html' => 'text/html',
-		'png' => 'image/png',
-		'gif' => 'image/gif',
-		'jpg' => 'image/jpeg',
-		'jpeg' => 'image/jpeg',
-		'ico' => 'image/x-icon',
+		'css'   => 'text/css',
+		'js'    => 'text/javascript',
+		'html'  => 'text/html',
+		'png'   => 'image/png',
+		'gif'   => 'image/gif',
+		'jpg'   => 'image/jpeg',
+		'jpeg'  => 'image/jpeg',
+		'ico'   => 'image/x-icon',
+		'eot'   => 'application/vnd.ms-fontobject',
+		'otf'   => 'application/font-sfnt',
+		'svg'   => 'image/svg+xml',
+		'ttf'   => 'application/font-sfnt',
+		'woff'  => 'application/font-woff',
+		'woff2' => 'font/woff2',
 	);
 	$matches = array();
 	if

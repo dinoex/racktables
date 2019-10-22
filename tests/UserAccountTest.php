@@ -15,7 +15,7 @@ class UserAccountTest extends RTTestCase
 
 	public function tearDown ()
 	{
-		usePreparedDeleteBlade ('UserAccount', array ('user_id' => $this->user_id));
+		commitDeleteUserAccount ($this->user_id);
 	}
 
 	/**
@@ -50,5 +50,52 @@ class UserAccountTest extends RTTestCase
 	public function testDuplicate ()
 	{
 		commitCreateUserAccount ($this->user_name, 'x' . self::REALNAME, sha1 (self::PSWDHASH));
+	}
+
+	/**
+	 * @group small
+	 * @expectedException InvalidArgException
+	 */
+	public function testInvalidPassword1 ()
+	{
+		commitUpdateUserAccount ($this->user_id, $this->user_name, self::REALNAME, 'password');
+	}
+
+	/**
+	 * @group small
+	 * @expectedException InvalidArgException
+	 */
+	public function testInvalidPassword2 ()
+	{
+		commitCreateUserAccount ($this->user_name, self::REALNAME, 'password');
+	}
+
+	/**
+	 * @group small
+	 * @expectedException EntityNotFoundException
+	 */
+	public function testDelete1 ()
+	{
+		$user2_id = commitCreateUserAccount ($this->user_name . 'x', self::REALNAME, self::PSWDHASH);
+		commitDeleteUserAccount ($user2_id);
+		spotEntity ('user', $user2_id, TRUE);
+	}
+
+	/**
+	 * @group small
+	 * @expectedException InvalidArgException
+	 */
+	public function testDelete2 ()
+	{
+		commitDeleteUserAccount (1);
+	}
+
+	/**
+	 * @group small
+	 * @expectedException EntityNotFoundException
+	 */
+	public function testDelete3 ()
+	{
+		commitDeleteUserAccount (1000000);
 	}
 }

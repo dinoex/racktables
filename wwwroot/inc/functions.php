@@ -38,8 +38,9 @@ define ('CHAP_OBJTYPE', 1);
 define ('RE_L2_IFCFG', '/^[0-9A-F]{2}(:[0-9A-F]{2}){5}$/'); // most ifconfigs
 define ('RE_L2_IFCFG_SUNOS', '/^[0-9A-F]{1,2}(:[0-9A-F]{1,2}){5}$/'); // SunOS ifconfig
 define ('RE_L2_CISCO', '/^[0-9A-F]{4}(\.[0-9A-F]{4}){2}$/');
+define ('RE_L2_HP', '/^[0-9A-F]{6}-[0-9A-F]{6}$/');
 define ('RE_L2_HUAWEI', '/^[0-9A-F]{4}(-[0-9A-F]{4}){2}$/');
-define ('RE_L2_SOLID', '/^[0-9A-F]{12}$/i');
+define ('RE_L2_SOLID', '/^[0-9A-F]{12}$/');
 define ('RE_L2_IPCFG', '/^[0-9A-F]{2}(-[0-9A-F]{2}){5}$/');
 define ('RE_L2_WWN_COLON', '/^[0-9A-F]{2}(:[0-9A-F]{2}){7}$/');
 define ('RE_L2_WWN_HYPHEN', '/^[0-9A-F]{2}(-[0-9A-F]{2}){7}$/');
@@ -49,6 +50,7 @@ define ('RE_L2_IPOIB_HYPHEN', '/^[0-9A-F]{2}(-[0-9A-F]{2}){19}$/');
 define ('RE_L2_IPOIB_SOLID', '/^[0-9A-F]{40}$/');
 define ('RE_IP4_ADDR', '#^[0-9]{1,3}(\.[0-9]{1,3}){3}$#');
 define ('RE_IP4_NET', '#^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$#');
+define ('RE_STATIC_URI', '#^(?:[[:alnum:]]+[[:alnum:]_.-]*/)+[[:alnum:]\._-]+\.([[:alpha:]]+)$#');
 define ('E_8021Q_NOERROR', 0);
 define ('E_8021Q_VERSION_CONFLICT', 101);
 define ('E_8021Q_PULL_REMOTE_ERROR', 102);
@@ -174,32 +176,31 @@ function defineIfNotDefined ($constant, $value, $case_insensitive = FALSE)
 		define ($constant, $value, $case_insensitive);
 }
 
-// This function assures that specified argument was passed
-// and is a number greater than zero.
+// For backward compatibility only, remove later.
 function assertUIntArg ($argname, $allow_zero = FALSE)
 {
-	if (!isset ($_REQUEST[$argname]))
-		throw new InvalidRequestArgException($argname, '', 'parameter is missing');
-	if (! isUnsignedInteger ($_REQUEST[$argname], $allow_zero))
-		throw new InvalidRequestArgException ($argname, $_REQUEST[$argname], 'parameter is not an unsigned integer' . ($allow_zero ? ' (or 0)' : ''));
-	return $_REQUEST[$argname];
+	return $allow_zero ? assertUnsignedIntArg ($argname) : assertNaturalNumArg ($argname);
 }
 
 // Tell whether the argument is a decimal integer (or, alternatively, a numeric
 // string with a decimal integer).
-function isInteger ($arg, $allow_zero = FALSE)
+function isInteger ($arg)
 {
 	// In PHP 7.0.0 and later is_numeric() rejects a string that contains
 	// a hexadecimal number, help PHP 5 achieve the same result here.
 	return is_numeric ($arg) &&
 		(! is_string ($arg) || FALSE === mb_strstr ($arg, '0x')) &&
-		is_int (0 + $arg) &&
-		($allow_zero || $arg != 0);
+		is_int (0 + $arg);
 }
 
-function isUnsignedInteger ($arg, $allow_zero = FALSE)
+function isUnsignedInteger ($arg)
 {
-	return isInteger ($arg, $allow_zero) && $arg >= 0;
+	return isInteger ($arg) && $arg >= 0;
+}
+
+function isNaturalNumber ($arg)
+{
+	return isInteger ($arg) && $arg >= 1;
 }
 
 function isHTMLColor ($color)
@@ -209,7 +210,25 @@ function isHTMLColor ($color)
 
 function isValidVLANID ($x)
 {
-	return isUnsignedInteger ($x) && $x >= VLAN_MIN_ID && $x <= VLAN_MAX_ID;
+	return isInteger ($x) && $x >= VLAN_MIN_ID && $x <= VLAN_MAX_ID;
+}
+
+function assertUnsignedIntArg ($argname)
+{
+	if (! isset ($_REQUEST[$argname]))
+		throw new InvalidRequestArgException ($argname, '', 'parameter is missing');
+	if (! isUnsignedInteger ($_REQUEST[$argname]))
+		throw new InvalidRequestArgException ($argname, $_REQUEST[$argname], 'parameter is not an unsigned integer (or 0)');
+	return $_REQUEST[$argname];
+}
+
+function assertNaturalNumArg ($argname)
+{
+	if (! isset ($_REQUEST[$argname]))
+		throw new InvalidRequestArgException ($argname, '', 'parameter is missing');
+	if (! isNaturalNumber ($_REQUEST[$argname]))
+		throw new InvalidRequestArgException ($argname, $_REQUEST[$argname], 'parameter is not a natural number');
+	return $_REQUEST[$argname];
 }
 
 # Make sure the arg is a parsable date, return its UNIX timestamp equivalent
@@ -268,6 +287,10 @@ function assertIPArg ($argname)
 	{
 		return ip_parse (assertStringArg ($argname));
 	}
+	catch (InvalidRequestArgException $irae)
+	{
+		throw $irae;
+	}
 	catch (InvalidArgException $e)
 	{
 		throw $e->newIRAE ($argname);
@@ -281,6 +304,10 @@ function assertIPv4Arg ($argname)
 	{
 		return ip4_parse (assertStringArg ($argname));
 	}
+	catch (InvalidRequestArgException $irae)
+	{
+		throw $irae;
+	}
 	catch (InvalidArgException $e)
 	{
 		throw $e->newIRAE ($argname);
@@ -293,6 +320,10 @@ function assertIPv6Arg ($argname)
 	try
 	{
 		return ip6_parse (assertStringArg ($argname));
+	}
+	catch (InvalidRequestArgException $irae)
+	{
+		throw $irae;
 	}
 	catch (InvalidArgException $e)
 	{
@@ -322,10 +353,22 @@ function genericAssertion ($argname, $argtype)
 		return assertStringArg ($argname);
 	case 'string0':
 		return assertStringArg ($argname, TRUE);
+	case 'natural0':
+		if ('' == assertStringArg ($argname, TRUE))
+			return '';
+		// fall through
+		// old style, for backward compatibility
 	case 'uint':
-		return assertUIntArg ($argname);
+	case 'natural':
+		return assertNaturalNumArg ($argname);
+	case 'unsigned0':
+		if ('' == assertStringArg ($argname, TRUE))
+			return '';
+		// fall through
+		// old style, for backward compatibility
 	case 'uint0':
-		return assertUIntArg ($argname, TRUE);
+	case 'unsigned':
+		return assertUnsignedIntArg ($argname);
 	case 'decimal0':
 		if ('' == assertStringArg ($argname, TRUE))
 			return '';
@@ -340,17 +383,19 @@ function genericAssertion ($argname, $argtype)
 		return assertIPv4Arg ($argname);
 	case 'inet6':
 		return assertIPv6Arg ($argname);
-	case 'l2address':
-		return assertStringArg ($argname);
 	case 'l2address0':
-		assertStringArg ($argname, TRUE);
+		if ('' == assertStringArg ($argname, TRUE))
+			return '';
+		// fall through
+	case 'l2address':
+		assertStringArg ($argname);
 		try
 		{
 			l2addressForDatabase ($sic[$argname]);
 		}
-		catch (InvalidArgException $e)
+		catch (InvalidArgException $iae)
 		{
-			throw new InvalidRequestArgException ($argname, $sic[$argname], 'malformed MAC/WWN address');
+			throw $iae->newIRAE ($argname);
 		}
 		return $sic[$argname];
 	case 'tag':
@@ -450,7 +495,7 @@ function genericAssertion ($argname, $argtype)
 			throw new InvalidRequestArgException ($argname, $sic[$argname], 'Unknown value');
 		return $sic[$argname];
 	case 'iif':
-		assertUIntArg ($argname);
+		assertNaturalNumArg ($argname);
 		if (!array_key_exists ($sic[$argname], getPortIIFOptions()))
 			throw new InvalidRequestArgException ($argname, $sic[$argname], 'Unknown value');
 		return $sic[$argname];
@@ -458,7 +503,7 @@ function genericAssertion ($argname, $argtype)
 	// 'vlan1' -- any valid VLAN ID including the default
 	case 'vlan':
 	case 'vlan1':
-		assertUIntArg ($argname);
+		assertNaturalNumArg ($argname);
 		if (! isValidVLANID ($sic[$argname]))
 			throw new InvalidRequestArgException ($argname, $sic[$argname], 'not a valid VLAN ID');
 		if ($argtype == 'vlan' && $sic[$argname] == VLAN_DFL_ID)
@@ -466,17 +511,18 @@ function genericAssertion ($argname, $argtype)
 		return $sic[$argname];
 	case 'uint-vlan':
 	case 'uint-vlan1':
+		$argvalue = assertStringArg ($argname);
 		try
 		{
-			list ($vdom_id, $vlan_id) = decodeVLANCK (assertStringArg ($argname));
+			list ($vdom_id, $vlan_id) = decodeVLANCK ($argvalue);
 		}
 		catch (InvalidArgException $iae)
 		{
-			throw new InvalidRequestArgException ($argname, $sic[$argname], $iae->getMessage());
+			throw $iae->newIRAE ($argname);
 		}
 		if ($argtype == 'uint-vlan' && $vlan_id == VLAN_DFL_ID)
-			throw new InvalidRequestArgException ($argname, $sic[$argname], 'default VLAN not allowed');
-		return $sic[$argname];
+			throw new InvalidRequestArgException ($argname, $argvalue, 'default VLAN not allowed');
+		return $argvalue;
 	case 'rackcode/expr':
 		if ('' == assertStringArg ($argname, TRUE))
 			return array();
@@ -581,8 +627,8 @@ function rectHeight ($rackData, $startRow, $template_idx)
 		for ($locidx = 0; $locidx < 3; $locidx++)
 		{
 			// At least one value in template is TRUE, but the following block
-			// can meet 'skipped' atoms. Let's ensure we have something after processing
-			// the first row.
+			// can meet 'skipped' atoms. Let's ensure there is at least some result
+			// after processing the first row.
 			if ($template[$template_idx][$locidx])
 			{
 				if
@@ -635,8 +681,8 @@ function markSpan (&$rackData, $startRow, $maxheight, $template_idx)
 }
 
 // This function sets rowspan/solspan/skipped atom attributes for renderRack()
-// What we actually have to do is to find _all_ possible rectangles for each unit
-// and then select the widest of those with the maximal square.
+// by finding _all_ possible rectangles for each rack unit and then selecting
+// the widest of those with the maximal square.
 function markAllSpans (&$rackData)
 {
 	for ($i = $rackData['height']; $i > 0; $i--)
@@ -664,7 +710,7 @@ function markBestSpan (&$rackData, $i)
 	return TRUE;
 }
 
-// We can mount 'F' atoms and unmount our own 'T' atoms.
+// OK to mount to 'F' atoms and unmount from the current object's 'T' atoms.
 function applyObjectMountMask (&$rackData, $object_id)
 {
 	for ($unit_no = $rackData['height']; $unit_no > 0; $unit_no--)
@@ -749,20 +795,14 @@ function markupAtomGrid (&$data, $checked_state)
 {
 	for ($unit_no = $data['height']; $unit_no > 0; $unit_no--)
 		for ($locidx = 0; $locidx < 3; $locidx++)
-		{
-			if (!($data[$unit_no][$locidx]['enabled'] === TRUE))
-				continue;
-			if ($data[$unit_no][$locidx]['state'] == $checked_state)
-				$data[$unit_no][$locidx]['checked'] = ' checked';
-			else
-				$data[$unit_no][$locidx]['checked'] = '';
-		}
+			if ($data[$unit_no][$locidx]['enabled'])
+				$data[$unit_no][$locidx]['checked'] =
+					$data[$unit_no][$locidx]['state'] == $checked_state ? ' checked' : '';
 }
 
-// This function is almost a clone of processGridForm(), but doesn't save anything to database
-// Return value is the changed rack data.
-// Here we assume that correct filter has already been applied, so we just
-// set or unset checkbox inputs w/o changing atom state.
+// This function is almost a clone of processGridForm(), except it does not modify
+// the database. This code assumes that a correct filter has already been applied,
+// hence it just sets or unsets checkbox inputs and leaves the atom state intact.
 function mergeGridFormToRack (&$rackData)
 {
 	$rack_id = $rackData['id'];
@@ -999,6 +1039,7 @@ function l2addressForDatabase ($string)
 		case preg_match (RE_L2_CISCO, $string):
 			$ret = str_replace ('.', '', $string);
 			break;
+		case preg_match (RE_L2_HP, $string):
 		case preg_match (RE_L2_HUAWEI, $string):
 			$ret = str_replace ('-', '', $string);
 			break;
@@ -1055,7 +1096,7 @@ function HTMLColorFromDatabase ($u)
 {
 	if ($u === NULL)
 		return NULL;
-	if (! isUnsignedInteger ($u, TRUE))
+	if (! isUnsignedInteger ($u))
 		throw new InvalidArgException ('u', $u, 'not an unsigned integer');
 	if ($u > 0xFFFFFF)
 		throw new InvalidArgException ('u', $u, 'value out of range');
@@ -1617,7 +1658,7 @@ function getImplicitTags ($oldtags)
 	$tmp = array();
 	foreach ($oldtags as $taginfo)
 		$tmp = array_merge ($tmp, $taglist[$taginfo['id']]['trace']);
-	// don't call array_unique here, it is in the function we will call now
+	// The call below already includes a call to array_unique().
 	return buildTagChainFromIds ($tmp);
 }
 
@@ -1718,7 +1759,7 @@ function redirectIfNecessary ()
 	// store the last visited tab name
 	if (isset ($_REQUEST['tab']))
 		$_SESSION['RTLT'][$pageno] = array ('tabname' => $tabno, 'time' => time());
-	session_commit(); // if we are continuing to run, unlock session data
+	session_commit(); // There was no redirection, unlock the session data.
 }
 
 function prepareNavigation()
@@ -1742,15 +1783,15 @@ function fixContext ($target = NULL)
 	if ($target !== NULL)
 	{
 		$target_given_tags = $target['etags'];
-		// Don't reset autochain, because auth procedures could push stuff there in.
-		// Another important point is to ignore 'user' realm, so we don't infuse effective
-		// context with autotags of the displayed account.
+		// Do not reset the autochain as it may have items generated during the authentication step.
+		// Ignore the "user" realm to keep the displayed user account autotags out of the
+		// effective security context.
 		if ($target['realm'] != 'user')
 			$auto_tags = array_merge ($auto_tags, $target['atags']);
 	}
 	elseif (array_key_exists ($pageno, $etype_by_pageno))
 	{
-		// Each page listed in the map above requires one uint argument.
+		// Each page listed in the map above requires one natural argument.
 		$target = spotEntity ($etype_by_pageno[$pageno], getBypassValue());
 		$target_given_tags = $target['etags'];
 		if ($target['realm'] != 'user')
@@ -1860,6 +1901,7 @@ function getObjectiveTagTree ($tree, $realm, $preselect)
 				'parent_id' => $taginfo['parent_id'],
 				'refcnt' => $taginfo['refcnt'],
 				'color' => $taginfo['color'],
+				'description' => $taginfo['description'],
 				'kids' => $subsearch
 			);
 		else
@@ -1977,7 +2019,8 @@ function getCellFilter ()
 	global $pageno;
 	$andor_used = FALSE;
 	startSession();
-	// if the page is submitted we get an andor value so we know they are trying to start a new filter or clearing the existing one.
+	// On the form submit "andor" appears on the request and means the user is
+	// trying to start a new filter or clear the existing one.
 	if (isset($_REQUEST['andor']))
 		$andor_used = TRUE;
 	if ($andor_used || array_key_exists ('clear-cf', $_REQUEST))
@@ -2696,7 +2739,7 @@ function constructIPRange ($ip_bin, $mask = NULL)
 		case 4: // IPv4
 			if ($mask === NULL)
 				$mask = 32;
-			elseif (! isUnsignedInteger ($mask, TRUE) || $mask > 32)
+			elseif (! isUnsignedInteger ($mask) || $mask > 32)
 				throw new InvalidArgException ('mask', $mask, "Invalid v4 prefix length");
 			$node['mask_bin'] = ip4_mask ($mask);
 			$node['mask'] = $mask;
@@ -2706,7 +2749,7 @@ function constructIPRange ($ip_bin, $mask = NULL)
 		case 16: // IPv6
 			if ($mask === NULL)
 				$mask = 128;
-			elseif (! isUnsignedInteger ($mask, TRUE) || $mask > 128)
+			elseif (! isUnsignedInteger ($mask) || $mask > 128)
 				throw new InvalidArgException ('mask', $mask, "Invalid v6 prefix length");
 			$node['mask_bin'] = ip6_mask ($mask);
 			$node['mask'] = $mask;
@@ -3144,9 +3187,9 @@ function buildPredicateTable (&$rackCode)
 	// make permitted() calls faster.
 	$rackCode = $new_rackCode;
 
-	// Now we have predicate table filled in with the latest definitions of each
-	// particular predicate met. This isn't as chik, as on-the-fly predicate
-	// overloading during allow/deny scan, but quite sufficient for this task.
+	// The latest (and the only, as the interpreter must not allow to redefine predicates)
+	// definition of every predicate is now in the predicate table, which will remain
+	// intact until the end of run-time.
 	return $ret;
 }
 
@@ -3510,7 +3553,7 @@ function decodeVLANCK ($string)
 	$matches = array();
 	if (1 != preg_match ('/^([[:digit:]]+)-([[:digit:]]+)$/', $string, $matches))
 		throw new InvalidArgException ('VLAN compound key', $string, 'format error');
-	if (! isUnsignedInteger ($matches[1]))
+	if (! isNaturalNumber ($matches[1]))
 		throw new InvalidArgException ('VLAN compound key', $string, 'domain ID cannot be 0');
 	if (! isValidVLANID ($matches[2]))
 		throw new InvalidArgException ('VLAN compound key', $string, 'invalid VLAN ID');
@@ -3531,7 +3574,7 @@ function formatVLANAsLabel ($vlaninfo)
 {
 	$ret = $vlaninfo['vlan_id'];
 	if ($vlaninfo['vlan_descr'] != '')
-		$ret .= ' <i>(' . niftyString ($vlaninfo['vlan_descr']) . ')</i>';
+		$ret .= ' <i>(' . stringForLabel ($vlaninfo['vlan_descr']) . ')</i>';
 	return $ret;
 }
 
@@ -3539,7 +3582,7 @@ function formatVLANAsPlainText ($vlaninfo)
 {
 	$ret = 'VLAN' . $vlaninfo['vlan_id'];
 	if ($vlaninfo['vlan_descr'] != '')
-		$ret .= ' (' . niftyString ($vlaninfo['vlan_descr'], 20, FALSE) . ')';
+		$ret .= ' (' . stringForLabel ($vlaninfo['vlan_descr'], 20) . ')';
 	return $ret;
 }
 
@@ -3560,9 +3603,9 @@ function formatVLANAsShortLink ($vlaninfo)
 function formatVLANAsRichText ($vlaninfo)
 {
 	$ret = 'VLAN' . $vlaninfo['vlan_id'];
-	$ret .= ' @' . niftyString ($vlaninfo['domain_descr']);
+	$ret .= ' @' . stringForLabel ($vlaninfo['domain_descr']);
 	if ($vlaninfo['vlan_descr'] != '')
-		$ret .= ' <i>(' . niftyString ($vlaninfo['vlan_descr']) . ')</i>';
+		$ret .= ' <i>(' . stringForLabel ($vlaninfo['vlan_descr']) . ')</i>';
 	return $ret;
 }
 
@@ -3698,13 +3741,13 @@ function buildVLANFilter ($role, $string)
 	switch ($role)
 	{
 	case 'access': // 1-4094
+	case 'anymode':
 		$min = VLAN_MIN_ID;
 		$max = VLAN_MAX_ID;
 		break;
 	case 'trunk': // 2-4094
 	case 'uplink':
 	case 'downlink':
-	case 'anymode':
 		$min = VLAN_MIN_ID + 1;
 		$max = VLAN_MAX_ID;
 		break;
@@ -3824,12 +3867,13 @@ function generate8021QDeployOps ($vswitch, $device_vlanlist, $before, $changes)
 	// 2. all "current" non-alien allowed VLANs of those ports that are left
 	//    intact (regardless if a VLAN exists in VLAN domain, but looking,
 	//    if it is present in device's own VLAN table)
-	// 3. all "new" allowed VLANs of those ports that we do "push" now
+	// 3. all "new" allowed VLANs of the ports to be "pushed" now
 	// Like for old_managed_vlans, a VLANs is never listed, only if it
 	// exists and belongs to "alien" type.
 	$new_managed_vlans = array();
-	// We need to count down the number of ports still using specific vlan
-	// in order to delete it from device as soon as vlan will be removed from the last port
+	// It is necessary to count down the number of ports still using a specific VLAN
+	// in order to unconfigure the VLAN on the switch as soon as the VLAN membership
+	// is removed from its last port.
 	// This array tracks port count:
 	//  * keys are vlan_id's;
 	//  * values are the number of changed ports that were using this vlan in old configuration
@@ -4778,7 +4822,7 @@ function authorize8021QChangeRequests ($before, $changes, $op = NULL)
 	{
 		if (! array_key_exists($pn, $before))
 		{
-			$removed = [];
+			$removed = array();
 			$added = $new['allowed'];
 		}
 		else
@@ -4797,10 +4841,10 @@ function authorize8021QChangeRequests ($before, $changes, $op = NULL)
 			}
 		}
 		foreach ($removed as $vid)
-			if (!permitted (NULL, NULL, $op, [['tag' => "\$fromvlan_{$vid}"], ['tag' => "\$vlan_{$vid}"]]))
+			if (!permitted (NULL, NULL, $op, array (array ('tag' => "\$fromvlan_{$vid}"), array ('tag' => "\$vlan_{$vid}"))))
 				continue 2; // next port
 		foreach ($added as $vid)
-			if (!permitted (NULL, NULL, $op, [['tag' => "\$tovlan_{$vid}"], ['tag' => "\$vlan_{$vid}"]]))
+			if (!permitted (NULL, NULL, $op, array (array ('tag' => "\$tovlan_{$vid}"), array ('tag' => "\$vlan_{$vid}"))))
 				continue 2; // next port
 		$ret[$pn] = $new;
 	}
@@ -4979,7 +5023,7 @@ function usort_portlist (&$portnames)
 // the string will be a part of an SQL query.
 function questionMarks ($count)
 {
-	if (! isUnsignedInteger ($count))
+	if (! isNaturalNumber ($count))
 		throw new InvalidArgException ('count', $count, 'must be greater than zero');
 	return implode (', ', array_fill (0, $count, '?'));
 }
@@ -5486,7 +5530,7 @@ function isConfigVarChanged ($varname, $varvalue)
 	if (!isset ($configCache[$varname]))
 		return TRUE;
 	if ($configCache[$varname]['vartype'] == 'uint')
-		return $configCache[$varname]['varvalue'] !== 0 + $varvalue;
+		return $configCache[$varname]['varvalue'] !== intval ($varvalue);
 	else
 		return $configCache[$varname]['varvalue'] !== $varvalue;
 }
@@ -5612,13 +5656,13 @@ function formatAgeSeconds ($seconds)
 		case $seconds < 86400 * 30.4375 * 4 :
 			$mon = intval ($seconds / 86400 / 30.4375);
 			$days = round (($seconds - $mon * 86400 * 30.4375) / 86400);
-			return ($days ? "${mon}m ${days}d" : "${mon}m") . ' ago';
+			return ($days ? "${mon}mo ${days}d" : "${mon}mo") . ' ago';
 		case $seconds < 365.25 * 86400:
-			return (round ($seconds / 86400 / 30.4375) . 'm') . ' ago';
+			return (round ($seconds / 86400 / 30.4375) . 'mo') . ' ago';
 		case $seconds < 2 * 365.25 * 86400:
 			$yrs = intval ($seconds / 86400 / 365.25);
 			$mon = round (($seconds - $yrs * 86400 * 365.25) / 86400 / 30.4375);
-			return ($mon ? "${yrs}y ${mon}m" : "${yrs}y") . ' ago';
+			return ($mon ? "${yrs}y ${mon}mo" : "${yrs}y") . ' ago';
 		default:
 			return (round ($seconds / 86400 / 365.25) . 'y') . ' ago';
 	}
@@ -6082,18 +6126,24 @@ function registerHook ($hook_name, $callback, $method = 'after')
 		array_push ($hooks_stack[$hook_name], $hook[$hook_name]);
 	$hook[$hook_name] = 'universalHookHandler';
 
-	// if we are trying to register on the built-in function, push it to the stack
+	// If the hook name is a built-in function, the function needs to be the first on the stack.
 	if (empty ($hooks_stack[$hook_name]) && is_callable ($hook_name))
 		array_push ($hooks_stack[$hook_name], $hook_name);
 
-	if ($method == 'before')
+	switch ($method)
+	{
+	case 'before':
 		array_unshift ($hooks_stack[$hook_name], $callback);
-	elseif ($method == 'after')
+		break;
+	case 'after':
 		array_push ($hooks_stack[$hook_name], $callback);
-	elseif ($method == 'chain')
+		break;
+	case 'chain':
 		array_push ($hooks_stack[$hook_name], '!' . $callback);
-	else
-		throw new InvalidRequestArgException ('method', $method, "Invalid hook method");
+		break;
+	default:
+		throw new InvalidArgException ('method', $method, 'Invalid hook method');
+	}
 }
 
 // hook handlers dispatcher. registerHook leaves 'universalHookHandler' in $hook
@@ -6108,7 +6158,7 @@ function universalHookHandler()
 	$bk_params = func_get_args();
 	$hook_name = array_shift ($bk_params);
 	if (! array_key_exists ($hook_name, $hooks_stack) || ! is_array ($hooks_stack[$hook_name]))
-		throw new InvalidRequestArgException ('hooks_stack["' . $hook_name . '"]', $hooks_stack[$hook_name]);
+		throw new RackTablesError ("malformed structure in hooks_stack['{$hook_name}']", RackTablesError::INTERNAL);
 	foreach ($hooks_stack[$hook_name] as $callback)
 	{
 		$params = $bk_params;
@@ -6245,13 +6295,11 @@ function formatEntityName ($entity)
 	return $ret;
 }
 
-// returns reversed (top-to-bottom) $unit_no if $rack_cell is configured to be reversed,
-// or unchanged $unit_no otherwise.
-function inverseRackUnit ($unit_no, $rack_cell)
+// Returns reversed (top-to-bottom) $unit_no if the rack is configured to be
+// that way (the calling function tells this), or unchanged $unit_no otherwise.
+function inverseRackUnit ($height, $unit_no, $reverse)
 {
-	if (considerConfiguredConstraint ($rack_cell, 'REVERSED_RACKS_LISTSRC'))
-		$unit_no = $rack_cell['height'] - $unit_no + 1;
-	return $unit_no;
+	return $reverse ? ($height - $unit_no + 1) : $unit_no;
 }
 
 // returns true either if given domains are the same
@@ -6274,7 +6322,6 @@ function checkPortRole ($vswitch, $portinfo, $port_name, $port_order)
 {
 	if (! $portinfo || ! $portinfo['linked'])
 		return TRUE; // not linked port
-
 
 	// find linked port with the same name
 	if ($port_name != $portinfo['name'])
@@ -6586,7 +6633,7 @@ function formatPatchCableHeapAsPlainText ($heap)
 	$text = "${heap['amount']} pcs: [${heap['end1_connector']}] ${heap['pctype']} [${heap['end2_connector']}]";
 	if ($heap['description'] != '')
 		$text .=  " (${heap['description']})";
-	return niftyString ($text, 512, FALSE);
+	return stringForOption ($text, 512);
 }
 
 // takes a list of structures and the field name in those structures.
