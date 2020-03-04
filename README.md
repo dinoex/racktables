@@ -1,15 +1,16 @@
 # Welcome!
 Thank you for selecting RackTables as your datacenter management solution!
 If you are looking for documentation or wish to send feedback, please
-look for the respective links at [project's web-site](http://racktables.org).
+look for the respective links at [project's web-site](https://racktables.org).
 
 # How to install RackTables
 
 ## 1. Prepare the server
 
-RackTables uses a web-server with PHP (5.5.0 or newer) for front-end and a
-MySQL/MariaDB server version 5 for back-end. The most commonly used web-server
-for RackTables is Apache httpd.
+RackTables uses a web-server with PHP (7.0 is the minimum required version, 7.1
+is the minimum tested version, 7.3 is the recommended version) for front-end and
+a MySQL/MariaDB server version 5 or later for back-end. The most commonly used
+web-server for RackTables is Apache httpd.
 
 ### 1.1. Install MySQL server
 
@@ -162,6 +163,9 @@ and initialize the application.
 4. Do that and report any errors to the bug tracker or the mailing list.
 
 ## Release notes
+
+### Upgrading to 0.22.0
+As of this release the minimum supported PHP version is 7.1.
 
 ### Upgrading to 0.21.2
 This version drops support for the `$localreports` global variable, which is

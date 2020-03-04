@@ -188,6 +188,11 @@ and "addCSSExternal()" functions.  The "addCSS()" function will likely be remove
 For more information on the "addJS()" and "addCSS()" changes see the README.md
 ENDOFTEXT
 ,
+
+	'0.22.0' => <<<'ENDOFTEXT'
+As of this release the minimum supported PHP version is 7.0.
+ENDOFTEXT
+,
 );
 
 // This function currently implements a convention that to upgrade any release R1
@@ -219,6 +224,7 @@ function getDBUpgradePath ($v1, $v2)
 		'0.21.2',
 		'0.21.3',
 		'0.21.4',
+		'0.22.0',
 	);
 	if (! in_array ($v1, $versionhistory) || ! in_array ($v2, $versionhistory))
 		return NULL;
@@ -1360,6 +1366,9 @@ INSERT INTO `Config` (varname, varvalue, vartype, emptyok, is_hidden, is_userdef
 			break;
 		case '0.21.4':
 			$query[] = "UPDATE Config SET varvalue = '0.21.4' WHERE varname = 'DB_VERSION'";
+			break;
+		case '0.22.0':
+			$query[] = "UPDATE Config SET varvalue = '0.22.0' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':
 			$query = reloadDictionary();

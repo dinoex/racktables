@@ -6,7 +6,7 @@ class TagTreeCircularReferenceTest extends RTTestCase
 {
 	protected $taga_id, $tagb_id, $tagc_id;
 
-	public function setUp ()
+	public function setUp () : void
 	{
 		// add sample data
 		usePreparedInsertBlade ('TagTree', array ('tag' => $this->myString ('tag a')));
@@ -17,7 +17,7 @@ class TagTreeCircularReferenceTest extends RTTestCase
 		$this->tagc_id = lastInsertID ();
 	}
 
-	public function tearDown ()
+	public function tearDown () : void
 	{
 		// remove sample data
 		$ids = array ($this->taga_id, $this->tagb_id, $this->tagc_id);
@@ -27,10 +27,10 @@ class TagTreeCircularReferenceTest extends RTTestCase
 
 	/**
 	 * @group small
-	 * @expectedException InvalidArgException
 	 */
 	public function testCreateCircularReference ()
 	{
+		$this->expectException (InvalidArgException::class);
 		// set A as the parent of B, and B as the parent of C
 		commitUpdateTag ($this->tagb_id, $this->myString ('tag b'), $this->taga_id, 'yes');
 		commitUpdateTag ($this->tagc_id, $this->myString ('tag c'), $this->tagb_id, 'yes');

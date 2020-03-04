@@ -4,13 +4,13 @@ class ObjectAttributesTest extends RTTestCase
 {
 	private $server_id, $switch_id;
 
-	public function setUp ()
+	public function setUp () : void
 	{
 		$this->server_id = commitAddObject ($this->myString ('server'), NULL, 4, NULL);
 		$this->switch_id = commitAddObject ($this->myString ('switch'), NULL, 8, NULL);
 	}
 
-	public function tearDown ()
+	public function tearDown () : void
 	{
 		commitDeleteObject ($this->server_id);
 		commitDeleteObject ($this->switch_id);
@@ -65,20 +65,20 @@ class ObjectAttributesTest extends RTTestCase
 
 	/**
 	 * @group small
-	 * @expectedException RTDatabaseError
 	 */
 	public function testIncompatible1 ()
 	{
+		$this->expectException (RTDatabaseError::class);
 		// SW version attribute is not enabled for servers by default
 		commitUpdateAttrValue ($this->server_id, 5, '1.2.3');
 	}
 
 	/**
 	 * @group small
-	 * @expectedException InvalidArgException
 	 */
 	public function testIncompatible2 ()
 	{
+		$this->expectException (InvalidArgException::class);
 		// no such attribute
 		commitUpdateAttrValue ($this->server_id, 5000, 0);
 	}
